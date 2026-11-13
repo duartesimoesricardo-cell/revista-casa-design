@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa & Design — Arquitetura, Design e Estilo de Vida</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/jpeg" href="logo-favicon.jpg">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PDF.js para renderizar as páginas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8f6f0;
+            color: #2c2a29;
+        }
+        .editorial-title {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* Palco 3D do Livro/Revista */
+        .book-stage {
+            perspective: 2500px;
+            position: relative;
+        }
+
+        .magazine-page-shadow {
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.28), 0 0 12px rgba(0,0,0,0.06);
+        }
+
+        /* Lombada central sutil */
+        .spine-shadow-left {
+            background: linear-gradient(to right, rgba(0,0,0,0) 88%, rgba(0,0,0,0.12) 100%);
+        }
+        .spine-shadow-right {
+            background: linear-gradient(to left, rgba(0,0,0,0) 88%, rgba(0,0,0,0.12) 100%);
+        }
+
+        /* Folha animada que vira sobre o eixo central */
+        .flip-leaf {
+            position: absolute;
+            top: 0;
+            transform-style: preserve-3d;
+            transition: transform 0.65s cubic-bezier(0.645, 0.045, 0.355, 1.000);
+            z-index: 25;
+            pointer-events: none;
+        }
+
+        .flip-leaf-front, .flip-leaf-back {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            background: white;
+            border: 1px solid #e6decb;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+        }
+
+        .flip-leaf-back {
+            transform: rotateY(180deg);
+        }
+
+        /* Transição para modo página única */
+        .single-flip-transition {
+            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+            transform-style: preserve-3d;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1ede4;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d9b884;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-[#f3dbb3] selection:text-[#5a431e]">
+
+    <!-- Header Editorial -->
+    <header class="bg-[#f8f6f0]/95 border-b border-[#e6decb] sticky top-0 z-50 backdrop-blur-md px-4 sm:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <a href="#" class="flex items-center group transition">
+                <img src="logo.png" alt="Casa & Design" class="h-12 sm:h-16 w-auto object-contain">
+            </a>
+            
+            <div class="flex items-center space-x-6">
+                <nav class="hidden sm:flex items-center space-x-6 text-xs font-semibold tracking-widest uppercase text-[#5a5446]">
+                    <a href="#editions-section" class="hover:text-[#a67c37] transition">Edições</a>
+                    <a href="#reader-section" class="hover:text-[#a67c37] transition">Leitor da Revista</a>
+                </nav>
+                <div id="auth-nav-container">
+                    <button onclick="openAuthModal()" class="px-4 py-2 bg-[#2c2a29] hover:bg-[#423e3c] text-[#f8f6f0] rounded-xl text-xs font-semibold tracking-wider uppercase transition shadow-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-user text-[11px]"></i>
+                        <span>Identificar-se</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Bloco de Abertura -->
+    <section class="relative w-full min-h-[75vh] flex items-center justify-center text-center px-4 py-24 overflow-hidden bg-[#161413]">
+        <div class="absolute inset-0 z-0 overflow-hidden">
+            <canvas id="hero-bg-canvas" class="w-full h-full object-cover filter brightness-[0.55] contrast-[1.05] scale-105"></canvas>
+        </div>
+        
+        <div class="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/85 z-10"></div>
+
+        <div class="relative z-20 max-w-4xl mx-auto space-y-6 text-white">
+            <span class="inline-block text-xs uppercase tracking-[0.3em] font-semibold text-[#f3dbb3] bg-black/50 px-5 py-2 rounded-full border border-[#f3dbb3]/30 backdrop-blur-md">
+                Arquitetura • Design • Estilo de Vida
+            </span>
+            
+            <h1 class="text-3xl sm:text-6xl font-bold editorial-title leading-tight text-[#fdfbf7] drop-shadow-md">
+                Um olhar sofisticado, atual e atemporal sobre o morar
+            </h1>
+            
+            <p class="text-sm sm:text-base text-gray-200 leading-relaxed max-w-2xl mx-auto font-light drop-shadow">
+                A <strong>Casa & Design</strong> reúne arquitetura, design e estilo de vida em uma plataforma editorial de excelência. Folheie as nossas edições e inspire-se.
+            </p>
+
+            <div class="pt-6">
+                <a href="#editions-section" class="inline-flex items-center space-x-3 px-8 py-4 bg-[#b59048] hover:bg-[#967433] text-white rounded-xl text-xs font-semibold tracking-wider uppercase transition shadow-2xl transform hover:-translate-y-0.5">
+                    <span>Escolher Edição</span>
+                    <i class="fa-solid fa-arrow-down text-[10px]"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modal de Identificação -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-[#fffdf9] rounded-2xl border border-[#e6decb] max-w-md w-full p-6 shadow-2xl relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-[#8c7b63] hover:text-[#2c2a29]">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="text-center mb-6">
+                <h3 class="text-2xl font-bold editorial-title text-[#2c2a29]">Acesso à Revista</h3>
+                <p class="text-xs text-[#736a58] mt-1">Insira os seus dados para desbloquear a leitura das edições.</p>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-[#5a431e] mb-1">Nome Completo</label>
+                    <input type="text" id="auth-fullname" required placeholder="O seu nome completo" class="w-full px-3 py-2.5 rounded-xl border border-[#e6decb] bg-[#f8f6f0] text-xs text-[#2c2a29] focus:outline-none focus:ring-1 focus:ring-[#b8975a]">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-[#5a431e] mb-1">Telemóvel / Telefone</label>
+                    <input type="text" id="auth-phone" required placeholder="(53) 99999-9999" oninput="maskPhone(this)" class="w-full px-3 py-2.5 rounded-xl border border-[#e6decb] bg-[#f8f6f0] text-xs text-[#2c2a29] focus:outline-none focus:ring-1 focus:ring-[#b8975a]">
+                </div>
+
+                <div id="auth-feedback" class="text-xs text-center font-medium hidden"></div>
+
+                <button type="submit" id="auth-submit-btn" class="w-full py-3 bg-[#2c2a29] hover:bg-[#423e3c] text-[#f8f6f0] rounded-xl text-xs font-semibold tracking-wider uppercase transition shadow">
+                    Desbloquear Leitura
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Zoom -->
+    <div id="page-zoom-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] hidden flex flex-col justify-between p-3 sm:p-6 overflow-hidden">
+        <div class="flex items-center justify-between w-full max-w-5xl mx-auto pt-2 pb-2">
+            <span id="zoom-page-label" class="text-xs font-mono text-white/90 bg-white/10 px-3.5 py-1.5 rounded-full">Página (Expandida)</span>
+            <button onclick="closeZoomModal()" class="px-4 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 shadow-lg">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Fechar Zoom</span>
+            </button>
+        </div>
+        
+        <div class="flex-1 flex items-center justify-center relative px-12 overflow-auto">
+            <button onclick="zoomPrevPage()" id="zoom-prev-btn" class="absolute left-2 sm:left-6 w-12 h-12 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition shadow-2xl z-10 disabled:opacity-30 disabled:cursor-not-allowed">
+                <i class="fa-solid fa-chevron-left text-lg"></i>
+            </button>
+
+            <canvas id="zoom-canvas" class="rounded-xl shadow-2xl max-w-full max-h-[80vh] object-contain"></canvas>
+
+            <button onclick="zoomNextPage()" id="zoom-next-btn" class="absolute right-2 sm:right-6 w-12 h-12 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition shadow-2xl z-10 disabled:opacity-30 disabled:cursor-not-allowed">
+                <i class="fa-solid fa-chevron-right text-lg"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Seção de Escolha das Edições -->
+    <section id="editions-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+        <div class="mb-8 text-center">
+            <span class="text-xs uppercase tracking-widest font-semibold text-[#a67c37] bg-[#f3dbb3]/30 px-3 py-1 rounded-full border border-[#f3dbb3]">Arquivo Digital</span>
+            <h2 class="text-3xl sm:text-4xl font-bold editorial-title mt-2 text-[#2c2a29]">Escolha a Edição para Ler</h2>
+            <p class="text-sm text-[#736a58] mt-1">Selecione uma edição para folhear com o verdadeiro efeito de revista.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <!-- Edição 1 -->
+            <div class="bg-[#fffdf9] rounded-2xl border border-[#e6decb] p-6 shadow-sm hover:shadow-md transition flex flex-col sm:flex-row gap-6 items-stretch">
+                <div class="w-full sm:w-44 h-60 bg-[#f1ede4] rounded-xl border border-[#e6decb] relative overflow-hidden flex-shrink-0 flex items-center justify-center shadow-inner">
+                    <canvas id="cover-canvas-1" class="w-full h-full object-cover rounded-xl"></canvas>
+                    <div id="cover-loading-1" class="absolute inset-0 flex flex-col items-center justify-center bg-[#f8f6f0] text-[#a67c37]">
+                        <i class="fa-solid fa-circle-notch fa-spin text-xl mb-2"></i>
+                        <span class="text-[10px] uppercase font-bold tracking-wider">A carregar capa</span>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-[#f3dbb3]/40 text-[#5a431e] px-2.5 py-1 rounded-md">Edição Inaugural</span>
+                        <h3 class="text-xl font-bold editorial-title text-[#2c2a29] mt-3 mb-2">Edição 1 • Julho de 2026</h3>
+                        <p class="text-xs text-[#736a58] leading-relaxed mb-4">Milão, Modernismo, Theatro Sete de Abril e muito mais.</p>
+                    </div>
+                    <button onclick="startReadingEdition(1)" class="w-full py-3 bg-[#2c2a29] hover:bg-[#423e3c] text-[#f8f6f0] rounded-xl text-xs font-semibold tracking-wider uppercase transition flex items-center justify-center space-x-2 shadow-sm">
+                        <i class="fa-solid fa-book-open"></i>
+                        <span>Abrir Leitor</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Edição 2 -->
+            <div class="bg-[#fffdf9] rounded-2xl border border-[#e6decb] p-6 shadow-sm hover:shadow-md transition flex flex-col sm:flex-row gap-6 items-stretch">
+                <div class="w-full sm:w-44 h-60 bg-[#f1ede4] rounded-xl border border-[#e6decb] relative overflow-hidden flex-shrink-0 flex items-center justify-center shadow-inner">
+                    <canvas id="cover-canvas-2" class="w-full h-full object-cover rounded-xl"></canvas>
+                    <div id="cover-loading-2" class="absolute inset-0 flex flex-col items-center justify-center bg-[#f8f6f0] text-[#a67c37]">
+                        <i class="fa-solid fa-circle-notch fa-spin text-xl mb-2"></i>
+                        <span class="text-[10px] uppercase font-bold tracking-wider">A carregar capa</span>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-[#a67c37] text-white px-2.5 py-1 rounded-md">Edição Atual</span>
+                        <h3 class="text-xl font-bold editorial-title text-[#2c2a29] mt-3 mb-2">Edição 2 • Setembro de 2026</h3>
+                        <p class="text-xs text-[#736a58] leading-relaxed mb-4">CASACOR RS, Charqueada Santa Rita, Casa Yller e Catedral.</p>
+                    </div>
+                    <button onclick="startReadingEdition(2)" class="w-full py-3 bg-[#a67c37] hover:bg-[#8e692e] text-white rounded-xl text-xs font-semibold tracking-wider uppercase transition flex items-center justify-center space-x-2 shadow-sm">
+                        <i class="fa-solid fa-book-open"></i>
+                        <span>Abrir Leitor</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Leitor da Revista com Efeito Físico de Folha Virando -->
+    <section id="reader-section" class="max-w-6xl mx-auto px-4 py-8 w-full hidden">
+        <div class="bg-[#fffdf9] rounded-2xl border border-[#e6decb] shadow-xl overflow-hidden flex flex-col">
+            
+            <!-- Barra Superior -->
+            <div class="p-4 sm:p-5 border-b border-[#e6decb] bg-[#f8f6f0] flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center space-x-3">
+                    <button onclick="backToEditions()" class="px-3 py-2 bg-[#eadecd] hover:bg-[#d8ccba] text-[#5a431e] rounded-xl text-xs font-semibold transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Edições</span>
+                    </button>
+                    <div>
+                        <span id="reader-edition-name" class="text-[10px] uppercase font-bold tracking-widest text-[#a67c37]">Edição</span>
+                        <h4 id="reader-page-counter" class="text-sm font-bold editorial-title text-[#2c2a29]">A carregar páginas...</h4>
+                    </div>
+                </div>
+
+                <!-- Seletor de Modo -->
+                <div class="flex items-center space-x-2 bg-[#eadecd] p-1 rounded-xl">
+                    <button id="mode-flip-btn" onclick="setReadingMode('spread')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-[#2c2a29] text-white flex items-center space-x-1.5">
+                        <i class="fa-solid fa-book-open"></i>
+                        <span>Modo Revista (Folhear)</span>
+                    </button>
+                    <button id="mode-single-btn" onclick="setReadingMode('single')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition text-[#5a5446] flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file"></i>
+                        <span>Página Única</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Área de Visualização -->
+            <div id="reader-viewport" class="relative bg-[#ece6de] p-4 sm:p-8 flex items-center justify-center min-h-[650px] overflow-hidden">
+                <div id="paywall-overlay" class="absolute inset-0 bg-[#fffdf9]/95 backdrop-blur-sm z-30 hidden flex flex-col items-center justify-center p-6 text-center">
+                    <div class="w-16 h-16 bg-[#f3dbb3]/40 text-[#b59048] rounded-full flex items-center justify-center mb-4 text-2xl">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold editorial-title text-[#2c2a29] mb-2">Conteúdo Exclusivo para Leitores</h3>
+                    <p class="text-xs text-[#736a58] max-w-md mb-6 leading-relaxed">Identifique-se com o seu nome e telemóvel para folhear esta edição completa.</p>
+                    <button onclick="openAuthModal()" class="px-6 py-3 bg-[#2c2a29] hover:bg-[#423e3c] text-[#f8f6f0] rounded-xl text-xs font-semibold tracking-wider uppercase transition shadow-md">
+                        Identificar-se Agora
+                    </button>
+                </div>
+
+                <!-- Modo Páginas Duplas (Spread) com Folha Animada 3D -->
+                <div id="spread-view-container" class="book-stage flex flex-row justify-center items-center w-auto relative">
+                    <!-- Página Esquerda -->
+                    <div id="left-page-wrapper" class="relative bg-white magazine-page-shadow rounded-l-lg p-1 border-y border-l border-[#e6decb] cursor-pointer overflow-hidden" onclick="openPageZoom(currentLeftPage)">
+                        <canvas id="canvas-left" class="max-h-[70vh] w-auto block rounded-l"></canvas>
+                        <div class="absolute inset-0 spine-shadow-left pointer-events-none"></div>
+                        <span class="absolute bottom-2 left-3 bg-black/60 text-white text-[9px] px-2 py-0.5 rounded font-mono">Pág. <span id="lbl-left">1</span></span>
+                    </div>
+
+                    <!-- Página Direita -->
+                    <div id="right-page-wrapper" class="relative bg-white magazine-page-shadow rounded-r-lg p-1 border border-[#e6decb] cursor-pointer overflow-hidden" onclick="openPageZoom(currentRightPage)">
+                        <canvas id="canvas-right" class="max-h-[70vh] w-auto block rounded-r"></canvas>
+                        <div class="absolute inset-0 spine-shadow-right pointer-events-none"></div>
+                        <span class="absolute bottom-2 right-3 bg-black/60 text-white text-[9px] px-2 py-0.5 rounded font-mono">Pág. <span id="lbl-right">2</span></span>
+                    </div>
+
+                    <!-- Folha 3D Flutuante para Animação de Virar Página -->
+                    <div id="anim-leaf" class="flip-leaf hidden">
+                        <div class="flip-leaf-front p-1 rounded-r-lg overflow-hidden">
+                            <canvas id="leaf-front-canvas" class="w-full h-full block"></canvas>
+                            <div class="absolute inset-0 spine-shadow-right pointer-events-none"></div>
+                        </div>
+                        <div class="flip-leaf-back p-1 rounded-l-lg overflow-hidden">
+                            <canvas id="leaf-back-canvas" class="w-full h-full block"></canvas>
+                            <div class="absolute inset-0 spine-shadow-left pointer-events-none"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modo Página Única -->
+                <div id="single-view-container" class="hidden relative bg-white magazine-page-shadow rounded-lg p-2 border border-[#e6decb] single-flip-transition cursor-pointer" onclick="openPageZoom(currentPage)">
+                    <canvas id="revista-canvas" class="max-h-[72vh] w-auto block rounded"></canvas>
+                    <div class="absolute bottom-2 right-4 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded font-mono pointer-events-none">
+                        Toque para ampliar
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Barra Inferior de Navegação -->
+            <div class="p-4 bg-[#f8f6f0] border-t border-[#e6decb] flex flex-wrap justify-between items-center gap-4">
+                <span class="text-xs text-[#8c7b63] hidden sm:inline-block"><i class="fa-solid fa-keyboard mr-1"></i> Use os botões ou as setas do teclado para folhear</span>
+                
+                <div class="flex items-center space-x-3 mx-auto sm:mx-0">
+                    <button onclick="prevPage()" id="prev-btn" class="px-5 py-2.5 bg-[#2c2a29] hover:bg-[#423e3c] text-white rounded-xl text-xs font-semibold tracking-wider uppercase transition shadow flex items-center space-x-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                        <span>Anterior</span>
+                    </button>
+                    
+                    <button onclick="nextPage()" id="next-btn" class="px-5 py-2.5 bg-[#2c2a29] hover:bg-[#423e3c] text-white rounded-xl text-xs font-semibold tracking-wider uppercase transition shadow flex items-center space-x-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <span>Seguinte</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+
+                    <button onclick="openPageZoom(currentPage)" class="px-4 py-2.5 bg-[#eadecd] hover:bg-[#d8ccba] text-[#5a431e] rounded-xl text-xs font-semibold tracking-wider uppercase transition flex items-center space-x-1.5" title="Ampliar Página">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                        <span>Zoom</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-[#f8f6f0] border-t border-[#e6decb] py-8 text-center text-xs text-[#8c7b63] mt-12">
+        <p>© 2026 Casa & Design. Todos os direitos reservados.</p>
+    </footer>
+
+    <!-- Script de Gestão do Leitor com Animação Real de Virar Folha -->
+    <script>
+        const SUPABASE_URL = 'https://exqoqahpnkispwznmutl.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4cW9xYWhwbmtpc3B3em5tdXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMzk2NTYsImV4cCI6MjEwNzcxNTY1Nn0.0qNqoQ-l19BCc_HQikD_vqnQ9Mvvkj6Naj_PqkpTM-s';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let isIdentified = false;
+        let currentEdition = 1;
+        let currentPage = 1;
+        let currentLeftPage = 1;
+        let currentRightPage = 2;
+        let zoomTargetPage = 1;
+        let totalPages = 0;
+        let readingMode = 'spread';
+        let isFlipping = false;
+        let pdfDocCache = { 1: null, 2: null };
+
+        const magazineConfig = {
+            1: { title: "Edição 1 • Julho 2026", url: "edicao1.pdf" },
+            2: { title: "Edição 2 • Setembro 2026", url: "edicao2.pdf" }
+        };
+
+        function openAuthModal() {
+            document.getElementById('auth-modal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.add('hidden');
+        }
+
+        function maskPhone(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            if (value.length > 6) {
+                value = `(${value.slice(0,2)}) ${value.slice(2,7)}-${value.slice(7)}`;
+            } else if (value.length > 2) {
+                value = `(${value.slice(0,2)}) ${value.slice(2)}`;
+            } else if (value.length > 0) {
+                value = `(${value}`;
+            }
+            input.value = value;
+        }
+
+        async function handleAuthSubmit(event) {
+            event.preventDefault();
+            const fullName = document.getElementById('auth-fullname').value.trim();
+            const phone = document.getElementById('auth-phone').value.trim();
+            const feedbackEl = document.getElementById('auth-feedback');
+
+            feedbackEl.classList.remove('hidden', 'text-red-600', 'text-green-600');
+            feedbackEl.innerText = "A guardar dados...";
+
+            const uniqueId = crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now();
+
+            const { error } = await supabaseClient
+                .from('profiles')
+                .upsert([
+                    { id: uniqueId, full_name: fullName, phone: phone }
+                ], { onConflict: 'phone' });
+
+            if (error) {
+                feedbackEl.classList.add('text-red-600');
+                feedbackEl.innerText = "Erro ao registar: " + error.message;
+                return;
+            }
+
+            localStorage.setItem('casa_design_reader', JSON.stringify({ fullName, phone }));
+            isIdentified = true;
+
+            feedbackEl.classList.add('text-green-600');
+            feedbackEl.innerText = "Acesso autorizado!";
+            
+            setTimeout(() => {
+                closeAuthModal();
+                updateUserUI(fullName);
+                document.getElementById('paywall-overlay').classList.add('hidden');
+                renderCurrentView(null);
+            }, 800);
+        }
+
+        function checkUserSession() {
+            const savedReader = localStorage.getItem('casa_design_reader');
+            if (savedReader) {
+                isIdentified = true;
+                const reader = JSON.parse(savedReader);
+                updateUserUI(reader.fullName);
+            } else {
+                isIdentified = false;
+            }
+        }
+
+        function updateUserUI(name) {
+            const container = document.getElementById('auth-nav-container');
+            container.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <span class="text-xs font-semibold text-[#5a431e]"><i class="fa-solid fa-circle-check text-green-600 mr-1"></i>${name}</span>
+                    <button onclick="handleLogout()" class="px-3 py-1.5 bg-[#a67c37] hover:bg-[#8e692e] text-white rounded-lg text-xs font-semibold uppercase transition">Sair</button>
+                </div>
+            `;
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('casa_design_reader');
+            location.reload();
+        }
+
+        function renderHeroBackground() {
+            const canvas = document.getElementById('hero-bg-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.src = 'jo-folha-1982.jpg';
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+            };
+            img.onerror = function() {
+                img.src = 'Jô Folha-1982.jpg';
+            };
+        }
+
+        async function getPdfDoc(edNum) {
+            if (pdfDocCache[edNum]) return pdfDocCache[edNum];
+            try {
+                const loadingTask = pdfjsLib.getDocument(magazineConfig[edNum].url);
+                pdfDocCache[edNum] = await loadingTask.promise;
+                return pdfDocCache[edNum];
+            } catch (e) {
+                console.error("Erro ao carregar PDF:", e);
+                return null;
+            }
+        }
+
+        async function loadCoverThumbnails() {
+            for (let ed = 1; ed <= 2; ed++) {
+                try {
+                    const pdfDoc = await getPdfDoc(ed);
+                    if (!pdfDoc) continue;
+                    const page = await pdfDoc.getPage(1);
+                    const canvas = document.getElementById(`cover-canvas-${ed}`);
+                    const context = canvas.getContext('2d');
+                    const viewport = page.getViewport({ scale: 0.5 });
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    document.getElementById(`cover-loading-${ed}`).style.display = 'none';
+                } catch (err) {
+                    console.error("Erro capa:", err);
+                }
+            }
+        }
+
+        async function startReadingEdition(edNum) {
+            currentEdition = edNum;
+            currentPage = 1;
+            currentLeftPage = 1;
+            currentRightPage = 1;
+            
+            const readerSection = document.getElementById('reader-section');
+            readerSection.classList.remove('hidden');
+            readerSection.scrollIntoView({ behavior: 'smooth' });
+
+            document.getElementById('reader-edition-name').innerText = magazineConfig[edNum].title;
+
+            const pdfDoc = await getPdfDoc(edNum);
+            if (pdfDoc) {
+                totalPages = pdfDoc.numPages;
+            }
+
+            if (!isIdentified) {
+                document.getElementById('paywall-overlay').classList.remove('hidden');
+            } else {
+                document.getElementById('paywall-overlay').classList.add('hidden');
+                renderCurrentView(null);
+            }
+        }
+
+        function setReadingMode(mode) {
+            if (isFlipping) return;
+            readingMode = mode;
+            const flipBtn = document.getElementById('mode-flip-btn');
+            const singleBtn = document.getElementById('mode-single-btn');
+            const spreadContainer = document.getElementById('spread-view-container');
+            const singleContainer = document.getElementById('single-view-container');
+
+            if (mode === 'spread') {
+                flipBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-[#2c2a29] text-white flex items-center space-x-1.5";
+                singleBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition text-[#5a5446] flex items-center space-x-1.5";
+                spreadContainer.classList.remove('hidden');
+                singleContainer.classList.add('hidden');
+                currentLeftPage = currentPage === 1 ? 1 : (currentPage % 2 === 0 ? currentPage : currentPage - 1);
+            } else {
+                singleBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-[#2c2a29] text-white flex items-center space-x-1.5";
+                flipBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition text-[#5a5446] flex items-center space-x-1.5";
+                singleContainer.classList.remove('hidden');
+                spreadContainer.classList.add('hidden');
+            }
+            renderCurrentView(null);
+        }
+
+        function backToEditions() {
+            document.getElementById('reader-section').classList.add('hidden');
+            document.getElementById('editions-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function drawPageToCanvas(pdfDoc, pageNum, canvas, scale = 1.1) {
+            if (!pdfDoc || pageNum < 1 || pageNum > totalPages) return;
+            const page = await pdfDoc.getPage(pageNum);
+            const ctx = canvas.getContext('2d');
+            const vp = page.getViewport({ scale: scale });
+            canvas.height = vp.height;
+            canvas.width = vp.width;
+            await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        }
+
+        // Renderiza com animação física realista de folha a virar sobre a lombada
+        async function renderCurrentView(direction) {
+            if (!isIdentified || isFlipping) return;
+
+            const pdfDoc = await getPdfDoc(currentEdition);
+            if (!pdfDoc) return;
+
+            if (readingMode === 'spread') {
+                const canvasL = document.getElementById('canvas-left');
+                const canvasR = document.getElementById('canvas-right');
+                const leftWrapper = document.getElementById('left-page-wrapper');
+                const rightWrapper = document.getElementById('right-page-wrapper');
+
+                // Sem direção (abertura inicial ou troca de modo)
+                if (!direction) {
+                    if (currentLeftPage === 1) {
+                        currentRightPage = 1;
+                        leftWrapper.style.display = 'none';
+                        rightWrapper.style.display = 'block';
+                        rightWrapper.classList.remove('rounded-r-lg');
+                        rightWrapper.classList.add('rounded-lg');
+                        await drawPageToCanvas(pdfDoc, 1, canvasR, 1.1);
+                    } else {
+                        if (currentLeftPage % 2 !== 0) currentLeftPage -= 1;
+                        currentRightPage = Math.min(currentLeftPage + 1, totalPages);
+                        leftWrapper.style.display = 'block';
+                        rightWrapper.style.display = currentLeftPage < totalPages ? 'block' : 'none';
+                        rightWrapper.classList.remove('rounded-lg');
+                        rightWrapper.classList.add('rounded-r-lg');
+                        await drawPageToCanvas(pdfDoc, currentLeftPage, canvasL, 1.1);
+                        if (currentLeftPage < totalPages) {
+                            await drawPageToCanvas(pdfDoc, currentRightPage, canvasR, 1.1);
+                        }
+                    }
+                    updateSpreadLabels();
+                    return;
+                }
+
+                // Animação real de virar a página
+                isFlipping = true;
+                const leaf = document.getElementById('anim-leaf');
+                const leafFront = document.getElementById('leaf-front-canvas');
+                const leafBack = document.getElementById('leaf-back-canvas');
+
+                const refWrapper = rightWrapper.style.display !== 'none' ? rightWrapper : leftWrapper;
+                const rect = refWrapper.getBoundingClientRect();
+                const stageRect = document.getElementById('spread-view-container').getBoundingClientRect();
+
+                leaf.style.width = rect.width + 'px';
+                leaf.style.height = rect.height + 'px';
+                leaf.style.top = (rect.top - stageRect.top) + 'px';
+
+                if (direction === 'next') {
+                    // Avançar: a folha da direita levanta e vira para a esquerda
+                    const oldRightPage = currentRightPage;
+                    const newLeftPage = currentLeftPage === 1 ? 2 : currentLeftPage + 2;
+                    const newRightPage = Math.min(newLeftPage + 1, totalPages);
+
+                    // Prepara frente (página direita atual) e verso (nova página esquerda)
+                    await drawPageToCanvas(pdfDoc, oldRightPage, leafFront, 1.1);
+                    await drawPageToCanvas(pdfDoc, newLeftPage, leafBack, 1.1);
+
+                    // Posiciona folha sobre o lado direito com eixo na lombada (left center)
+                    leaf.style.transition = 'none';
+                    leaf.style.left = (rect.left - stageRect.left) + 'px';
+                    leaf.style.transformOrigin = 'left center';
+                    leaf.style.transform = 'rotateY(0deg)';
+                    leaf.classList.remove('hidden');
+
+                    // Atualiza o fundo direito para a nova página que ficará por baixo
+                    if (newLeftPage < totalPages) {
+                        rightWrapper.style.display = 'block';
+                        rightWrapper.classList.remove('rounded-lg');
+                        rightWrapper.classList.add('rounded-r-lg');
+                        await drawPageToCanvas(pdfDoc, newRightPage, canvasR, 1.1);
+                    } else {
+                        rightWrapper.style.display = 'none';
+                    }
+
+                    // Força reflow e dispara a rotação 3D
+                    void leaf.offsetWidth;
+                    leaf.style.transition = 'transform 0.65s cubic-bezier(0.645, 0.045, 0.355, 1.000)';
+                    leaf.style.transform = 'rotateY(-180deg)';
+
+                    setTimeout(async () => {
+                        currentLeftPage = newLeftPage;
+                        currentRightPage = newRightPage;
+                        leftWrapper.style.display = 'block';
+                        await drawPageToCanvas(pdfDoc, currentLeftPage, canvasL, 1.1);
+                        leaf.classList.add('hidden');
+                        updateSpreadLabels();
+                        isFlipping = false;
+                    }, 660);
+
+                } else if (direction === 'prev') {
+                    // Recuar: a folha da esquerda levanta e vira para a direita
+                    const oldLeftPage = currentLeftPage;
+                    const newLeftPage = currentLeftPage <= 2 ? 1 : currentLeftPage - 2;
+                    const newRightPage = newLeftPage === 1 ? 1 : newLeftPage + 1;
+
+                    // Prepara verso (página esquerda atual) e frente (nova página direita)
+                    await drawPageToCanvas(pdfDoc, oldLeftPage, leafBack, 1.1);
+                    await drawPageToCanvas(pdfDoc, newRightPage, leafFront, 1.1);
+
+                    const leftRect = leftWrapper.getBoundingClientRect();
+                    leaf.style.transition = 'none';
+                    leaf.style.left = (leftRect.right - stageRect.left) + 'px';
+                    leaf.style.transformOrigin = 'left center';
+                    leaf.style.transform = 'rotateY(-180deg)';
+                    leaf.classList.remove('hidden');
+
+                    // Atualiza o fundo esquerdo para o que ficará revelado por baixo
+                    if (newLeftPage === 1) {
+                        leftWrapper.style.display = 'none';
+                    } else {
+                        leftWrapper.style.display = 'block';
+                        await drawPageToCanvas(pdfDoc, newLeftPage, canvasL, 1.1);
+                    }
+
+                    void leaf.offsetWidth;
+                    leaf.style.transition = 'transform 0.65s cubic-bezier(0.645, 0.045, 0.355, 1.000)';
+                    leaf.style.transform = 'rotateY(0deg)';
+
+                    setTimeout(async () => {
+                        currentLeftPage = newLeftPage;
+                        currentRightPage = newRightPage;
+                        rightWrapper.style.display = 'block';
+                        if (currentLeftPage === 1) {
+                            rightWrapper.classList.remove('rounded-r-lg');
+                            rightWrapper.classList.add('rounded-lg');
+                        }
+                        await drawPageToCanvas(pdfDoc, currentRightPage, canvasR, 1.1);
+                        leaf.classList.add('hidden');
+                        updateSpreadLabels();
+                        isFlipping = false;
+                    }, 660);
+                }
+
+            } else {
+                // Modo Página Única
+                document.getElementById('reader-page-counter').innerText = `Página ${currentPage} de ${totalPages}`;
+                document.getElementById('prev-btn').disabled = currentPage <= 1;
+                document.getElementById('next-btn').disabled = currentPage >= totalPages;
+
+                const singleContainer = document.getElementById('single-view-container');
+                if (direction) {
+                    isFlipping = true;
+                    singleContainer.style.transform = direction === 'next' ? 'rotateY(-85deg) scale(0.95)' : 'rotateY(85deg) scale(0.95)';
+                    singleContainer.style.opacity = '0.2';
+                    setTimeout(async () => {
+                        await drawPageToCanvas(pdfDoc, currentPage, document.getElementById('revista-canvas'), 1.35);
+                        singleContainer.style.transform = 'rotateY(0deg) scale(1)';
+                        singleContainer.style.opacity = '1';
+                        isFlipping = false;
+                    }, 220);
+                } else {
+                    await drawPageToCanvas(pdfDoc, currentPage, document.getElementById('revista-canvas'), 1.35);
+                }
+            }
+        }
+
+        function updateSpreadLabels() {
+            currentPage = currentLeftPage;
+            document.getElementById('reader-page-counter').innerText = currentLeftPage === 1
+                ? `Capa (Página 1 de ${totalPages})`
+                : `Páginas ${currentLeftPage} - ${currentRightPage} de ${totalPages}`;
+            document.getElementById('prev-btn').disabled = currentLeftPage <= 1;
+            document.getElementById('next-btn').disabled = currentRightPage >= totalPages;
+            document.getElementById('lbl-left').innerText = currentLeftPage;
+            document.getElementById('lbl-right').innerText = currentRightPage;
+        }
+
+        function nextPage() {
+            if (isFlipping) return;
+            if (readingMode === 'spread') {
+                if (currentRightPage < totalPages) {
+                    renderCurrentView('next');
+                }
+            } else {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderCurrentView('next');
+                }
+            }
+        }
+
+        function prevPage() {
+            if (isFlipping) return;
+            if (readingMode === 'spread') {
+                if (currentLeftPage > 1) {
+                    renderCurrentView('prev');
+                }
+            } else {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderCurrentView('prev');
+                }
+            }
+        }
+
+        async function openPageZoom(pageNum) {
+            if (!isIdentified) {
+                openAuthModal();
+                return;
+            }
+            zoomTargetPage = pageNum || (readingMode === 'spread' ? currentRightPage : currentPage);
+            const modal = document.getElementById('page-zoom-modal');
+            const canvas = document.getElementById('zoom-canvas');
+            const label = document.getElementById('zoom-page-label');
+            
+            modal.classList.remove('hidden');
+            label.innerText = `Página ${zoomTargetPage} de ${totalPages} (Expandida)`;
+            document.getElementById('zoom-prev-btn').disabled = zoomTargetPage <= 1;
+            document.getElementById('zoom-next-btn').disabled = zoomTargetPage >= totalPages;
+
+            const pdfDoc = await getPdfDoc(currentEdition);
+            if (!pdfDoc) return;
+
+            await drawPageToCanvas(pdfDoc, zoomTargetPage, canvas, 2.2);
+        }
+
+        function zoomNextPage() {
+            if (zoomTargetPage < totalPages) {
+                openPageZoom(zoomTargetPage + 1);
+            }
+        }
+
+        function zoomPrevPage() {
+            if (zoomTargetPage > 1) {
+                openPageZoom(zoomTargetPage - 1);
+            }
+        }
+
+        function closeZoomModal() {
+            document.getElementById('page-zoom-modal').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (isIdentified) {
+                const isZoomOpen = !document.getElementById('page-zoom-modal').classList.contains('hidden');
+                const isReaderOpen = !document.getElementById('reader-section').classList.contains('hidden');
+
+                if (isZoomOpen) {
+                    if (e.key === 'ArrowRight') zoomNextPage();
+                    if (e.key === 'ArrowLeft') zoomPrevPage();
+                    if (e.key === 'Escape') closeZoomModal();
+                } else if (isReaderOpen) {
+                    if (e.key === 'ArrowRight') nextPage();
+                    if (e.key === 'ArrowLeft') prevPage();
+                }
+            }
+        });
+
+        window.onload = () => {
+            renderHeroBackground();
+            checkUserSession();
+            loadCoverThumbnails();
+        };
+    </script>
+</body>
+</html>
